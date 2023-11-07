@@ -1,20 +1,31 @@
-import motor.motor_asyncio
-import asyncio
+import json
+import motor.motor_asyncio as ms
 
-client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://javierjimenez:Loquendo1252@cluster0.2stzbkr.mongodb.net/?retryWrites=true&w=majority")
 
-db = client.Clase
 
-collection = db.Alumnos
+cliente = ms
 
-async def insertar():
-    document = {
-        "name" : "Luis",
-        "edad" : 17,
-        "mesa" : 2
-    }
+async def conectar(uri):
+    global cliente
     
-    await collection.insert_one(document)
+    if 'mongodb' in uri:
+        cliente = cliente.AsyncIOMotorClient(uri)
+        return True
+    else:
+        return False
+
+async def insertar(string):
+    global cliente
     
-loop = client.get_io_loop()
-loop.run_until_complete(insertar())
+    docu = json.loads(string)
+    
+    db = cliente.Clase
+
+    collection = db.Alumnos
+    
+    await collection.insert_one(docu)
+    
+    return True
+
+async def insert_app(string):
+    return await insertar(string)
