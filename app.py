@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from mongo import insert_app, conectar
+from mongo import insert_app, conectar, mostrar_databases , mostrar_colecciones , set_collection , set_db , get_db
 from async_tkinter_loop import async_handler
 from async_tkinter_loop.mixins import AsyncCTk
 
@@ -16,13 +16,38 @@ class App(ctk.CTk, AsyncCTk):
         self.login = Login(self)
         self.login.place(anchor = "n", relx = 0.5 , rely = 0,
                          relwidth = 1 , relheight = 1)
-        
-        self.tabs = Pestañas(self)
-        self.tabs.place(anchor = "n", relx = 0.5, rely = 0,
-                        relwidth = 1 , relheight = 1)
-        
-        self.login.lift(aboveThis=self.tabs)
 
+class Selector(ctk.CTkFrame , AsyncCTk):
+    def __init__(self, root):
+        super().__init__(master= root , width= 0)
+        self.buscar_databases()
+        self.db_var = ctk.StringVar(value= "Databases")
+        self.db_var.trace_add("write" , callback= self.definir_base)
+        self.col_var = ctk.StringVar(value= "Coleccion")
+        
+    def definir_base(self, nose1 , nose2, nose3):
+        """
+        con sinceridad esos parametros no se que son
+        """      
+        set_db(self.db_var.get())
+        
+        self.buscar_colecciones(get_db())
+        
+        print("se ha definido una base")
+        
+    @async_handler
+    async def buscar_colecciones(self, db):
+        self.coleccion_selector.configure(values = await mostrar_colecciones(db), command = lambda x: set_collection(x))
+        print("esto deberia correr")
+        
+        
+    @async_handler
+    async def buscar_databases(self):
+        ctk.CTkOptionMenu(self , values= await mostrar_databases(), variable= self.db_var).pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
+        self.coleccion_selector = ctk.CTkOptionMenu(self , values= [], variable= self.col_var)
+        self.coleccion_selector.pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
+        
+        
 class Login(ctk.CTkFrame , AsyncCTk):
     def __init__(self, root):
         super().__init__(master= root)
@@ -35,6 +60,11 @@ class Login(ctk.CTkFrame , AsyncCTk):
     async def log_in(self):        
         if await conectar(self.user_var.get()):
             self.destroy()
+            #Pestañas(self.master).place(anchor = "nw", relx = 0.15, rely = 0, relwidth = 0.85 , relheight = 1)
+            #Selector(self.master).place(x = 0  , y = 0 , anchor = "nw" , relheight = 1)
+            
+            Selector(self.master).pack(side = "left", fill = "y" , padx = 10)
+            Pestañas(self.master).pack(side = "left" , expand = True , fill = "both")
         else:
             self.alert_var.set("revisa tu Connection string")
     
@@ -64,6 +94,8 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
     
     @async_handler   
     async def insertar(self, documento):
+        self.boton.configure(state="disabled")
+        
         self.progressb.place(relx = 0.5 , rely = 0.75 , relwidth = 0.5, anchor = "center")
         self.progressb.start()
         if await insert_app(documento):
@@ -72,6 +104,7 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
             self.txtvar.set("ERROR")
         self.progressb.stop()
         self.progressb.place_forget()
+        self.boton.configure(state="normal")
                 
     def pestaña1 (self):
         # letras encabezado
@@ -95,9 +128,9 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
         
         
         # botones
-        boton = ctk.CTkButton(self.tab("Insertar"), text= "Boton",
+        self.boton = ctk.CTkButton(self.tab("Insertar"), text= "Boton",
                               command= lambda: self.insertar(txt.get("0.0" , "end")) )
-        boton.place(relx = 0.5 , rely= 0.83 , relwidth = 0.3,
+        self.boton.place(relx = 0.5 , rely= 0.83 , relwidth = 0.3,
                     anchor = "center")
         
         
@@ -105,5 +138,6 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
         label = ctk.CTkLabel(self.tab("Insertar"),
                              textvariable = self.txtvar)
         label.place(relx = 0.5 , rely = 0.9, anchor = "center")
-        
+
+
 App().async_mainloop()
