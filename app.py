@@ -20,12 +20,16 @@ class App(ctk.CTk, AsyncCTk):
                          relwidth = 1 , relheight = 1)
 
 class Selector(ctk.CTkFrame , AsyncCTk):
-    def __init__(self, root):
+    def __init__(self, root , online = True):
         super().__init__(master= root , width= 0)
-        self.buscar_databases()
-        self.db_var = ctk.StringVar(value= "Databases")
-        self.db_var.trace_add("write" , callback= self.definir_base)
-        self.col_var = ctk.StringVar(value= "Coleccion")
+        
+        if not online:
+            self.buscar_databases_offline()
+        else:
+            self.buscar_databases()
+            self.db_var = ctk.StringVar(value= "Databases")
+            self.db_var.trace_add("write" , callback= self.definir_base)
+            self.col_var = ctk.StringVar(value= "Coleccion")
         
     def definir_base(self, nose1 , nose2, nose3):
         """
@@ -47,6 +51,11 @@ class Selector(ctk.CTkFrame , AsyncCTk):
     async def buscar_databases(self):
         ctk.CTkOptionMenu(self , values= await mostrar_databases(), variable= self.db_var).pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
         self.coleccion_selector = ctk.CTkOptionMenu(self , values= [], variable= self.col_var)
+        self.coleccion_selector.pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
+    
+    def buscar_databases_offline(self):
+        ctk.CTkOptionMenu(self , values= ["data1" , "data2" , "data3"]).pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
+        self.coleccion_selector = ctk.CTkOptionMenu(self , values= ["col1" , "col2" , "col3"])
         self.coleccion_selector.pack( ipadx = 10, padx = 5 , pady = 5, anchor = "center")
         
 class Login(ctk.CTkFrame , AsyncCTk):
@@ -78,6 +87,12 @@ class Login(ctk.CTkFrame , AsyncCTk):
         else:
             self.alert_var.set("revisa tu Connection string")
     
+    @async_handler
+    async def debug_log_in(self):
+        self.destroy()
+        Selector(self.master , False).pack(side = "left", fill = "y" , padx = 5)
+        Pestañas(self.master).pack(side = "left" , expand = True , fill = "both", padx = 5)
+    
     def inicio(self):
         input_user = ctk.CTkEntry(self, textvariable= self.user_var)
         input_user.place(relx = 0.5 , rely = 0.4, anchor = "center",
@@ -89,6 +104,9 @@ class Login(ctk.CTkFrame , AsyncCTk):
         
         alert_label = ctk.CTkLabel(self, textvariable = self.alert_var, text_color= "red")
         alert_label.place(relx = 0.5, rely = 0.65 , anchor = "center")
+        
+        debug_ingresar = ctk.CTkButton(self , text= "debug" , command= self.debug_log_in)
+        debug_ingresar.place(x = 0 , y = 0 , anchor = "nw")
     
     
     def reciente(self):
@@ -112,98 +130,118 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
         self.add("Actualizar")
         self.pestaña1()
         self.pestaña2()
-    
+
     @async_handler   
-    async def insertar(self, documento):
-        self.boton.configure(state="disabled")
-        
-        self.progressb.place(relx = 0.5 , rely = 0.75 , relwidth = 0.5, anchor = "center")
-        self.progressb.start()
-        if await insert_app(documento):
-            self.txtvar.set("DATO INGRESADO")
-        else:
-            self.txtvar.set("ERROR")
-        self.progressb.stop()
-        self.progressb.place_forget()
-        self.boton.configure(state="normal")
+    async def insertar(self, documento , funcion):
+        funcion(True) 
+        match documento:
+            case None:
+                self.txtvar.set("ERROR")
+                funcion(False)
+            case _:
+                self.txtvar.set("DATO INGRESADO") and funcion(False) if await insert_app(documento) else self.txtvar.set("ERROR") and funcion(False)
     
     @async_handler
-    async def buscar(self):
-        self.boton_buscar.configure(state = "disabled")
+    async def buscar(self, func):
+        func(True)
         data = await search_app(self.clave_var.get() , self.valor_var.get())
         match data:
             case False:
-                self.boton_buscar.configure(state = "normal")
-                self.alerta_busc_var.set("Seleccione una Database y una Coleccion")
+                func(False , "Selecciona una Database y una Colection")
             case []:
-                self.boton_buscar.configure(state = "normal")
-                self.alerta_busc_var.set("Sin Datos")
+                func(False , "Sin Datos")
             case _:
-                self.ventanita = VentanaBusqueda(self.tab("Buscar"), data)
-                self.ventanita.bind("<Destroy>" , func= lambda ev: self.boton_buscar.configure(state = "normal"))
-            
-        
+                self.ventanita = VentanaBusquedaSup(self.tab("Buscar"), data)
+                self.ventanita.bind("<Destroy>" , func= lambda ev: func(False , ""))
+          
+    ####pestaña 1  
                 
     def pestaña1 (self):
+        PestañaInsertar().crearse(self.tab("Insertar"), self.txtvar, self.insertar)
+    
+    ####pestaña2
+
+    def pestaña2 (self):
+        PestañaBuscar().crearse(self.tab("Buscar") , self.clave_var , self.valor_var , self.alerta_busc_var , self.buscar)
+
+class PestañaInsertar():
+    def switch_boton_y_barra(self, booleano):
+        if booleano:
+            self.boton.configure(state="disabled")
+            self.progressb.place(relx = 0.5 , rely = 0.75 , relwidth = 0.5, anchor = "center")
+            self.progressb.start()
+        else:
+            self.progressb.stop()
+            self.progressb.place_forget()
+            self.boton.configure(state="normal")
+    
+    def crearse(self, root, txtvar, insertar):
         # letras encabezado
-        header = ctk.CTkLabel(self.tab("Insertar"),
+        header = ctk.CTkLabel(root,
                               text= "Debe colocar la clave entre comillas sino no se creará",
                               font= ctk.CTkFont("monospace", 14))
         header.place(relx = 0.5 , rely = 0.1 , anchor = "center")
         
-        
         # caja de texto
-        txt = ctk.CTkTextbox(self.tab("Insertar"))
+        txt = ctk.CTkTextbox(root)
         txt.place(anchor = "center" , relx = 0.5 , rely = 0.45,
                   relwidth = 0.5 , relheight = 0.5)
         
         
         # barra de progreso
-        self.progressb = ctk.CTkProgressBar(self.tab("Insertar"),
+        self.progressb = ctk.CTkProgressBar(root,
                                        orientation= "horizontal",
                                        mode= "indeterminate",
                                        )
         
-        
         # botones
-        self.boton = ctk.CTkButton(self.tab("Insertar"), text= "Boton",
-                              command= lambda: self.insertar(txt.get("0.0" , "end")) )
+        self.boton = ctk.CTkButton(root, text= "Boton",
+                              command= lambda: insertar(txt.get("0.0" , "end") if txt.get("0.0" , "end").isprintable() else None, self.switch_boton_y_barra))
         self.boton.place(relx = 0.5 , rely= 0.83 , relwidth = 0.3,
                     anchor = "center")
         
-        
         # labels
-        label = ctk.CTkLabel(self.tab("Insertar"),
-                             textvariable = self.txtvar)
+        label = ctk.CTkLabel(root,
+                             textvariable = txtvar)
         label.place(relx = 0.5 , rely = 0.9, anchor = "center")
+
+class PestañaBuscar():
+    def switch_boton_alerta(self , booleano , argumento = ""):
+        if booleano:
+            self.boton_buscar.configure(state = "disabled")
+        else:
+            self.boton_buscar.configure(state = "normal")
+            self.alerta_var.set(argumento)
+            
     
-    def pestaña2 (self):
-        consejo = ctk.CTkLabel(self.tab("Buscar"), text= "vacie las cajas para buscar toda la coleccion", font= ctk.CTkFont("monospace" , 18))
+    def crearse(self , root , clave_var , valor_var, alerta_var, buscar):
+        self.alerta_var = alerta_var
+        
+        consejo = ctk.CTkLabel(root, text= "vacie las cajas para buscar toda la coleccion", font= ctk.CTkFont("monospace" , 18))
         consejo.place(relx = 0.5 , rely = 0.2, anchor = "center")
         
         # buscar
-        clave_txt = ctk.CTkLabel(self.tab("Buscar"), text= "clave", font= ctk.CTkFont("monospace" , 14))
+        clave_txt = ctk.CTkLabel(root, text= "clave", font= ctk.CTkFont("monospace" , 14))
         clave_txt.place(relx = 0.4 , rely = 0.32 , anchor = "center")
         
-        entry_key = ctk.CTkEntry(self.tab("Buscar"), textvariable= self.clave_var)
+        entry_key = ctk.CTkEntry(root, textvariable= clave_var)
         entry_key.place(relx = 0.48 , rely = 0.4 , anchor = "e", relheight = 0.12, relwidth = 0.15)
         
-        valor_txt = ctk.CTkLabel(self.tab("Buscar"), text= "valor", font= ctk.CTkFont("monospace" , 14))
+        valor_txt = ctk.CTkLabel(root, text= "valor", font= ctk.CTkFont("monospace" , 14))
         valor_txt.place(relx = 0.595 , rely = 0.32 , anchor = "center")
         
-        entry_val = ctk.CTkEntry(self.tab("Buscar"), textvariable= self.valor_var)
+        entry_val = ctk.CTkEntry(root, textvariable= valor_var)
         entry_val.place(relx = 0.52 , rely = 0.4 , anchor = "w", relheight = 0.12 , relwidth = 0.15)
         
         # boton
-        self.boton_buscar = ctk.CTkButton(self.tab("Buscar"), text= "Buscar" , command= self.buscar)
+        self.boton_buscar = ctk.CTkButton(root, text= "Buscar" , command= lambda: buscar(self.switch_boton_alerta))
         self.boton_buscar.place(relx = 0.5 , rely = 0.52, anchor = "center")
         
         # alerta
-        self.alerta_busc = ctk.CTkLabel(self.tab("Buscar") , font= ctk.CTkFont("monospace" , 14) , textvariable = self.alerta_busc_var , text_color= "red")
+        self.alerta_busc = ctk.CTkLabel(root , font= ctk.CTkFont("monospace" , 14) , textvariable = alerta_var , text_color= "red")
         self.alerta_busc.place(anchor = "center" , relx = 0.5 , rely = 0.6)
-
-
-class VentanaBusqueda(ctk.CTkToplevel , AsyncCTk):
+        
+class VentanaBusquedaSup(ctk.CTkToplevel , AsyncCTk):
     def __init__(self , root, data):
         super().__init__(master = root)
         self.geometry("600x600")

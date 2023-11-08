@@ -2,3 +2,5 @@ packaging
 customtkinter
 pymongo
 motor
+async-tkinter-loop
+python-dotenv

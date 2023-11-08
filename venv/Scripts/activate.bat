@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\Equipo\Documents\Laboratorio\Interfaz-MongoDB\venv
+set VIRTUAL_ENV=C:\Users\alumno\5to\Javier\interfaz-mongodb\Interfaz-MongoDB\venv
 
 if not defined PROMPT set PROMPT=$P$G
 

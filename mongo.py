@@ -64,13 +64,11 @@ async def search_app(key , value):
     
     documentos = []
     
-    
     try:
         async for docu in cliente[database][coleccion].find(doc_kv):
             docu.pop("_id")
             documentos.append(tuple(docu)+tuple(docu.values()))         
     except Exception as exc:
-        print(exc)
         return False
     
     return documentos
