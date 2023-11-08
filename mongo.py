@@ -43,14 +43,34 @@ async def mostrar_colecciones(db):
     lista : list = await cliente.get_database(db).list_collection_names()
     return lista
 
-async def insertar(string):
+async def insert_app(string : str):
     global cliente , database , coleccion
     
-    docu = json.loads(string)
+    docu = json.loads(string.strip())
     
-    await cliente[database][coleccion].insert_one(docu)
+    try:
+        await cliente[database][coleccion].insert_one(docu)
+    except:
+        return False
     
     return True
 
-async def insert_app(string):
-    return await insertar(string)
+async def search_app(key , value):
+    global cliente , database, coleccion
+    if key and value:
+        doc_kv = {key : value}
+    else:
+        doc_kv = {}
+    
+    documentos = []
+    
+    
+    try:
+        async for docu in cliente[database][coleccion].find(doc_kv):
+            docu.pop("_id")
+            documentos.append(tuple(docu)+tuple(docu.values()))         
+    except Exception as exc:
+        print(exc)
+        return False
+    
+    return documentos
