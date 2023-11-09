@@ -72,3 +72,18 @@ async def search_app(key , value):
         return False
     
     return documentos
+
+async def delete_app(key , value):
+    if key and value:
+        return True
+    else:
+        return False
+    
+async def update_app(key , value , docu , modo : str):
+    #modo u for update
+    #modo r for replace
+    
+    if key and value:
+        return True if docu else False
+    else:
+        return False

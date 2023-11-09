@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from mongo import insert_app, conectar, mostrar_databases , mostrar_colecciones , set_collection , set_db , get_db, search_app
+from mongo import insert_app, conectar, mostrar_databases , mostrar_colecciones , set_collection , set_db , get_db, search_app, delete_app
 from async_tkinter_loop import async_handler
 from async_tkinter_loop.mixins import AsyncCTk
 import os
@@ -128,8 +128,10 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
         
         self.add("Borrar")
         self.add("Actualizar")
+
         self.pestaña1()
         self.pestaña2()
+        self.pestaña3()
 
     @async_handler   
     async def insertar(self, documento , funcion):
@@ -142,17 +144,34 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
                 self.txtvar.set("DATO INGRESADO") and funcion(False) if await insert_app(documento) else self.txtvar.set("ERROR") and funcion(False)
     
     @async_handler
-    async def buscar(self, func):
-        func(True)
+    async def buscar(self, funcion):
+        funcion(True)
         data = await search_app(self.clave_var.get() , self.valor_var.get())
         match data:
             case False:
-                func(False , "Selecciona una Database y una Colection")
+                funcion(False , "Selecciona una Database y una Colection")
             case []:
-                func(False , "Sin Datos")
+                funcion(False , "Sin Datos")
             case _:
                 self.ventanita = VentanaBusquedaSup(self.tab("Buscar"), data)
-                self.ventanita.bind("<Destroy>" , func= lambda ev: func(False , ""))
+                self.ventanita.bind("<Destroy>" , func= lambda ev: funcion(False , ""))
+    
+    @async_handler
+    async def borrar(self , funcion):
+        funcion(True)
+        data = await delete_app(self.clave_var.get() , self.valor_var.get())
+        match data:
+            case True:
+                print("bien")
+                funcion(False , "datos eliminados")
+            case False:
+                print("bien 2")
+                funcion(False , "error")
+    
+    @async_handler
+    async def actualizar(self , funcion):
+        pass
+        
           
     ####pestaña 1  
                 
@@ -163,7 +182,12 @@ class Pestañas(ctk.CTkTabview, AsyncCTk):
 
     def pestaña2 (self):
         PestañaBuscar().crearse(self.tab("Buscar") , self.clave_var , self.valor_var , self.alerta_busc_var , self.buscar)
-
+    
+    ####pestaña3
+    
+    def pestaña3(self):
+        PestañaBorrar().crearse(self.tab("Borrar"), self.clave_var , self.valor_var , self.alerta_busc_var , self.borrar)
+        
 class PestañaInsertar():
     def switch_boton_y_barra(self, booleano):
         if booleano:
@@ -240,7 +264,46 @@ class PestañaBuscar():
         # alerta
         self.alerta_busc = ctk.CTkLabel(root , font= ctk.CTkFont("monospace" , 14) , textvariable = alerta_var , text_color= "red")
         self.alerta_busc.place(anchor = "center" , relx = 0.5 , rely = 0.6)
+
+class PestañaBorrar():
+    def switch_boton_alerta(self , booleano , argumento = ""):
+        if booleano:
+            self.boton_borrar.configure(state = "disabled")
+        else:
+            self.boton_borrar.configure(state = "normal")
+            self.alerta_var.set(argumento)
+    
+    def crearse(self , root, clave_var, valor_var , alerta_var , borrar):
+        self.alerta_var = alerta_var
         
+        consejo = ctk.CTkLabel(root, text= "vacie las cajas para borrar toda la coleccion", font= ctk.CTkFont("monospace" , 18))
+        consejo.place(relx = 0.5 , rely = 0.2, anchor = "center")
+        
+        # buscar y borrar
+        clave_txt = ctk.CTkLabel(root, text= "clave", font= ctk.CTkFont("monospace" , 14))
+        clave_txt.place(relx = 0.4 , rely = 0.32 , anchor = "center")
+        
+        entry_key = ctk.CTkEntry(root, textvariable= clave_var)
+        entry_key.place(relx = 0.48 , rely = 0.4 , anchor = "e", relheight = 0.12, relwidth = 0.15)
+        
+        valor_txt = ctk.CTkLabel(root, text= "valor", font= ctk.CTkFont("monospace" , 14))
+        valor_txt.place(relx = 0.595 , rely = 0.32 , anchor = "center")
+        
+        entry_val = ctk.CTkEntry(root, textvariable= valor_var)
+        entry_val.place(relx = 0.52 , rely = 0.4 , anchor = "w", relheight = 0.12 , relwidth = 0.15)
+        
+        # boton
+        self.boton_borrar = ctk.CTkButton(root, text= "Buscar" , command= lambda: borrar(self.switch_boton_alerta))
+        self.boton_borrar.place(relx = 0.5 , rely = 0.52, anchor = "center")
+        
+        # alerta
+        self.alerta_busc = ctk.CTkLabel(root , font= ctk.CTkFont("monospace" , 14) , textvariable = alerta_var , text_color= "red")
+        self.alerta_busc.place(anchor = "center" , relx = 0.5 , rely = 0.6)
+        
+class PestañaActualizar():
+    def crearse(root , clave_var , valor_var , alerta_var , actualizar):
+        pass
+
 class VentanaBusquedaSup(ctk.CTkToplevel , AsyncCTk):
     def __init__(self , root, data):
         super().__init__(master = root)
