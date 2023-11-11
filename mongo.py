@@ -22,7 +22,7 @@ def get_db():
 
 async def conectar(uri):
     global cliente
-    if not 'mongodb' in uri:
+    if not "mongo" in uri:
         return False
     
     try:
@@ -46,44 +46,72 @@ async def mostrar_colecciones(db):
 async def insert_app(string : str):
     global cliente , database , coleccion
     
-    docu = json.loads(string.strip())
-    
     try:
+        docu = json.loads(string.strip())
         await cliente[database][coleccion].insert_one(docu)
     except:
         return False
     
     return True
 
-async def search_app(key , value):
+async def search_app(doc):
     global cliente , database, coleccion
-    if key and value:
-        doc_kv = {key : value}
-    else:
-        doc_kv = {}
+    if not doc:
+        return "t"
     
     documentos = []
     
     try:
-        async for docu in cliente[database][coleccion].find(doc_kv):
+        docu = json.loads(doc)
+        async for docu in cliente[database][coleccion].find(docu):
             docu.pop("_id")
-            documentos.append(tuple(docu)+tuple(docu.values()))         
+            documentos.append(docu)         
     except Exception as exc:
         return False
     
     return documentos
 
-async def delete_app(key , value):
-    if key and value:
-        return True
-    else:
+async def delete_app(doc):
+    global cliente , database, coleccion
+        
+    try:
+        docu = json.loads(doc)
+        result = await cliente[database][coleccion].delete_many(docu)
+    except:
         return False
+        
+    return result.deleted_count
+            
     
-async def update_app(key , value , docu , modo : str):
+async def update_app(query , docu , modo : str):
+    global cliente , database , coleccion
     #modo u for update
     #modo r for replace
-    
-    if key and value:
-        return True if docu else False
-    else:
+    if not(query and docu) or query == '{}' or docu == '{}':
         return False
+    
+    match modo:
+        case "u":
+            try:
+                await delete_app(query)
+                
+                q : dict = json.loads(query)
+                d : dict = json.loads(docu)
+                
+                q.update(d)
+                
+                print(q)
+                
+                await cliente[database][coleccion].insert_one(q)
+            except:
+                return False
+        case "r":
+            try:
+                q : dict = json.loads(query)
+                d : dict = json.loads(docu)
+
+                await cliente[database][coleccion].replace_one(q , d)
+            except:
+                return False
+        
+    return True
