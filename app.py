@@ -70,13 +70,11 @@ class Login(ctk.CTkFrame , AsyncCTk):
         self.reciente()
     
     @async_handler
-    async def log_in(self):
-        dire = dotenv.find_dotenv()
+    async def log_in(self, uri = None):
         
-        if dire:
+        if not uri:
+            dire = dotenv.find_dotenv()
             uri = dotenv.get_key(dire, "secret")
-        else:
-            uri = self.user_var.get()
         
         if await conectar(uri):
             self.destroy()
@@ -97,7 +95,7 @@ class Login(ctk.CTkFrame , AsyncCTk):
         input_user.place(relx = 0.5 , rely = 0.4, anchor = "center",
                          relwidth = 0.3 , relheight = 0.1)
                 
-        ingresar_but = ctk.CTkButton(self, text= "ingresar" , font= ctk.CTkFont("motiva sans", 14), command= self.log_in)
+        ingresar_but = ctk.CTkButton(self, text= "ingresar" , font= ctk.CTkFont("motiva sans", 14), command= lambda : self.log_in(self.user_var.get()))
         ingresar_but.place(relx = 0.5 , rely = 0.55, anchor = "center",
                            relwidth = 0.3 , relheight = 0.1)
         
@@ -106,9 +104,11 @@ class Login(ctk.CTkFrame , AsyncCTk):
     
     
     def reciente(self):
-        if dotenv.find_dotenv():
-            boton_reciente = ctk.CTkButton(self , text= "Usar Sesion Reciente", fg_color = "green", command= self.log_in)
-            boton_reciente.place(relx = 0.5, rely = 0.72 , anchor = "center")
+        dire = dotenv.find_dotenv()
+        if dire:
+            if dotenv.get_key(dire , "secret") != "null":
+                boton_reciente = ctk.CTkButton(self , text= "Usar Sesion Reciente", fg_color = "green", command= self.log_in)
+                boton_reciente.place(relx = 0.5, rely = 0.72 , anchor = "center")
 
 class Pestañas(ctk.CTkTabview, AsyncCTk):
     def __init__(self, root):
